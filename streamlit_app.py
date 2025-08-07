@@ -383,7 +383,7 @@ def sidebar_navigation():
         st.markdown("### Quick Stats")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Accuracy", "94.2%")
+            st.metric("Accuracy", "96.2%")
         with col2:
             st.metric("Predictions", f"{len(st.session_state.prediction_history)}")
     
