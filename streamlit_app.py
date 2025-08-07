@@ -171,7 +171,7 @@ def build_fallback_model():
 def mock_predict_skin_condition():
     """Generate realistic mock predictions for testing"""
     # Create more realistic probability distributions
-    conditions = ['Skin Cancer', 'Eczema', 'Vitiligo']
+    conditions = ['Eczema','Skin Cancer', 'Vitiligo']
     
     # Generate probabilities that sum to 1
     raw_probs = np.random.dirichlet([1.5, 1.0, 0.8])  # Slightly bias towards first condition
