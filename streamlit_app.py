@@ -183,7 +183,8 @@ def sidebar_navigation():
         
         page = st.selectbox(
             "Navigate to:",
-            ["Home", "Prediction", "Find Doctors", "About", "History"]
+            ["Home", "Prediction", "Find Doctors", "About", "History"],
+            key="main_navigation_selectbox"
         )
         
         st.markdown("---")
@@ -243,7 +244,8 @@ def prediction_page():
         uploaded_file = st.file_uploader(
             "Choose an image...", 
             type=['jpg', 'jpeg', 'png'],
-            help="Upload a clear image of the affected skin area"
+            help="Upload a clear image of the affected skin area",
+            key="image_uploader"
         )
         
         if uploaded_file is not None:
@@ -252,7 +254,7 @@ def prediction_page():
             st.image(image, caption="Uploaded Image", use_column_width=True)
             
             # Prediction button
-            if st.button("🔍 Analyze Image", type="primary"):
+            if st.button("🔍 Analyze Image", type="primary", key="analyze_button"):
                 if model is not None:
                     with st.spinner("Analyzing image..."):
                         predicted_class, results = predict_skin_condition(image, model)
@@ -313,10 +315,11 @@ def doctors_page():
         st.markdown("### Select Location")
         governorate = st.selectbox(
             "Choose Governorate:",
-            ["Cairo", "Giza", "Alexandria", "Qalyubia"]
+            ["Cairo", "Giza", "Alexandria", "Qalyubia"],
+            key="governorate_selector"
         )
         
-        if st.button("🔍 Search Doctors", type="primary"):
+        if st.button("🔍 Search Doctors", type="primary", key="search_doctors_button"):
             with st.spinner("Searching for doctors..."):
                 doctors = scrape_doctors(governorate.lower())
                 
@@ -409,7 +412,7 @@ def history_page():
             st.plotly_chart(fig, use_container_width=True)
         
         # Clear history button
-        if st.button("🗑️ Clear History", type="secondary"):
+        if st.button("🗑️ Clear History", type="secondary", key="clear_history_button"):
             st.session_state.prediction_history = []
             st.success("History cleared successfully!")
             st.rerun()  # Fixed deprecated st.experimental_rerun()
