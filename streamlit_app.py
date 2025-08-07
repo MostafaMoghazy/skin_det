@@ -521,7 +521,7 @@ def doctors_page():
         st.markdown("### Select Location")
         governorate = st.selectbox(
             "Choose Governorate:",
-            ["Cairo", "Giza", "Alexandria", "Qalyubia"],
+            ["Cairo", "Giza", "Alexandria", "Qalyubia", 'hurghada'],
             key="governorate_selector"
         )
         
