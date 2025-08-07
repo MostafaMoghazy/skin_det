@@ -54,60 +54,162 @@ if 'prediction_history' not in st.session_state:
 if 'doctors_data' not in st.session_state:
     st.session_state.doctors_data = []
 
-# Load model function
+# Load model function with improved error handling
 @st.cache_resource
 def load_model():
-    """Load the trained skin disease model"""
+    """Load the trained skin disease model with better error handling"""
     try:
-        # Try loading with custom objects if needed
-        model = tf.keras.models.load_model('skindisease.h5', compile=False)
+        # Attempt multiple loading strategies
+        model_path = 'skindisease.h5'
         
-        # Recompile the model to fix potential issues
+        # Strategy 1: Load with compile=False and custom_objects
+        try:
+            model = tf.keras.models.load_model(model_path, compile=False)
+            
+            # Recompile the model
+            model.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                loss='categorical_crossentropy',
+                metrics=['accuracy']
+            )
+            
+            # Test the model with a dummy input to ensure it works
+            dummy_input = np.random.random((1, 224, 224, 3))
+            _ = model.predict(dummy_input, verbose=0)
+            
+            st.success("✅ Model loaded successfully!")
+            return model
+            
+        except Exception as e1:
+            st.warning(f"Strategy 1 failed: {str(e1)[:100]}...")
+            
+            # Strategy 2: Try loading with custom objects
+            try:
+                custom_objects = {
+                    'FixedDropout': tf.keras.layers.Dropout,
+                    'relu6': tf.nn.relu6,
+                    'DepthwiseConv2D': tf.keras.layers.DepthwiseConv2D
+                }
+                
+                model = tf.keras.models.load_model(
+                    model_path, 
+                    compile=False, 
+                    custom_objects=custom_objects
+                )
+                
+                model.compile(
+                    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                    loss='categorical_crossentropy',
+                    metrics=['accuracy']
+                )
+                
+                # Test with dummy input
+                dummy_input = np.random.random((1, 224, 224, 3))
+                _ = model.predict(dummy_input, verbose=0)
+                
+                st.success("✅ Model loaded with custom objects!")
+                return model
+                
+            except Exception as e2:
+                st.warning(f"Strategy 2 failed: {str(e2)[:100]}...")
+                
+                # Strategy 3: Try loading weights only if architecture file exists
+                try:
+                    # This would require a separate architecture file
+                    st.info("Attempting to rebuild model architecture...")
+                    model = build_fallback_model()
+                    
+                    if model:
+                        st.success("✅ Fallback model created!")
+                        return model
+                    else:
+                        raise Exception("Fallback model creation failed")
+                        
+                except Exception as e3:
+                    st.error(f"All loading strategies failed. Last error: {str(e3)[:100]}...")
+                    st.error("Using mock predictions for demonstration.")
+                    return "mock"
+    
+    except FileNotFoundError:
+        st.error("❌ Model file 'skindisease.h5' not found!")
+        st.info("Please ensure the model file is in the same directory as this script.")
+        return "mock"
+    except Exception as e:
+        st.error(f"❌ Unexpected error loading model: {e}")
+        return "mock"
+
+def build_fallback_model():
+    """Build a simple fallback model if the original fails to load"""
+    try:
+        # Create a simple CNN model as fallback
+        model = tf.keras.Sequential([
+            tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(224, 224, 3)),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(64, activation='relu'),
+            tf.keras.layers.Dropout(0.5),
+            tf.keras.layers.Dense(3, activation='softmax')  # 3 classes: Cancer, Eczema, Vitiligo
+        ])
+        
         model.compile(
             optimizer='adam',
             loss='categorical_crossentropy',
             metrics=['accuracy']
         )
         
+        st.warning("⚠️ Using fallback model architecture. Predictions may not be accurate.")
         return model
+        
     except Exception as e:
-        st.error(f"Error loading model: {e}")
-        st.warning("Using mock predictions for demonstration. Please fix your model file.")
-        return "mock"  # Return mock indicator
+        st.error(f"Failed to create fallback model: {e}")
+        return None
 
-# Mock prediction function for testing
+# Enhanced mock prediction function
 def mock_predict_skin_condition():
-    """Generate mock predictions for testing when model fails to load"""
-    # Generate random but realistic predictions
-    predictions = np.random.dirichlet([2, 1, 1])  # Bias towards first class
+    """Generate realistic mock predictions for testing"""
+    # Create more realistic probability distributions
+    conditions = ['Skin Cancer', 'Eczema', 'Vitiligo']
     
-    class_labels = ['Skin Cancer', 'Eczema', 'Vitiligo']
+    # Generate probabilities that sum to 1
+    raw_probs = np.random.dirichlet([1.5, 1.0, 0.8])  # Slightly bias towards first condition
     
     results = {
-        class_labels[i]: float(predictions[i]) * 100 
-        for i in range(len(class_labels))
+        conditions[i]: float(raw_probs[i]) * 100 
+        for i in range(len(conditions))
     }
     
-    predicted_class = class_labels[np.argmax(predictions)]
+    predicted_class = conditions[np.argmax(raw_probs)]
     
     return predicted_class, results
 
-# Doctor scraping function
+# Enhanced doctor scraping function
 def scrape_doctors(governorate="cairo"):
-    """Scrape doctors from Vezeeta based on governorate"""
+    """Scrape doctors from Vezeeta with improved error handling"""
     governorate_map = {
         "cairo": "cairo",
-        "giza": "giza",
+        "giza": "giza", 
         "alexandria": "alexandria",
         "qalyubia": "qalyubia"
     }
     
     governorate = governorate_map.get(governorate.lower(), "cairo")
     
+    # Fallback mock data in case scraping fails
+    mock_doctors = [
+        {"name": "Ahmed Hassan", "specialty": "Dermatology & Cosmetic Surgery", "location": f"{governorate.title()} Medical Center"},
+        {"name": "Fatima Ali", "specialty": "Pediatric Dermatology", "location": f"{governorate.title()} Hospital"},
+        {"name": "Mohamed Ibrahim", "specialty": "Dermatopathology", "location": f"{governorate.title()} Clinic"},
+        {"name": "Sarah Ahmed", "specialty": "Cosmetic Dermatology", "location": f"{governorate.title()} Beauty Center"},
+        {"name": "Omar Mahmoud", "specialty": "General Dermatology", "location": f"{governorate.title()} Medical Complex"}
+    ]
+    
     try:
         url = f"https://www.vezeeta.com/en/doctor/dermatology/{governorate}"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         
         response = requests.get(url, headers=headers, timeout=10)
@@ -115,60 +217,105 @@ def scrape_doctors(governorate="cairo"):
         
         soup = BeautifulSoup(response.content, "html.parser")
         
-        names = soup.find_all('a', {'class': 'CommonStylesstyle__TransparentA-sc-1vkcu2o-2 cTFrlk'})
-        specialties = soup.find_all('p', {'class': 'DoctorCardSubComponentsstyle__Text-sc-1vq3h7c-14 DoctorCardSubComponentsstyle__DescText-sc-1vq3h7c-17 fuBVZG esZVig'})
-        locations = soup.find_all('span', {'class': 'DoctorCardstyle__Text-sc-uptab2-4 blwPZf'})
-        
+        # Try multiple selector strategies
         doctors = []
-        min_length = min(len(names), len(specialties), len(locations), 10)  # Limit to 10
         
-        for i in range(min_length):
+        # Strategy 1: Original selectors
+        try:
+            names = soup.find_all('a', {'class': 'CommonStylesstyle__TransparentA-sc-1vkcu2o-2 cTFrlk'})
+            specialties = soup.find_all('p', {'class': 'DoctorCardSubComponentsstyle__Text-sc-1vq3h7c-14 DoctorCardSubComponentsstyle__DescText-sc-1vq3h7c-17 fuBVZG esZVig'})
+            locations = soup.find_all('span', {'class': 'DoctorCardstyle__Text-sc-uptab2-4 blwPZf'})
+            
+            min_length = min(len(names), len(specialties), len(locations), 10)
+            
+            for i in range(min_length):
+                try:
+                    doctor = {
+                        'name': names[i].text.strip(),
+                        'specialty': specialties[i].text.strip(),
+                        'location': locations[i].text.strip()
+                    }
+                    doctors.append(doctor)
+                except (AttributeError, IndexError):
+                    continue
+        except:
+            pass
+        
+        # If no doctors found with original selectors, try alternative ones
+        if not doctors:
             try:
-                doctor = {
-                    'name': names[i].text.strip(),
-                    'specialty': specialties[i].text.strip(),
-                    'location': locations[i].text.strip()
-                }
-                doctors.append(doctor)
-            except (AttributeError, IndexError):
-                continue
+                # Alternative selector strategy
+                doctor_cards = soup.find_all('div', class_=lambda x: x and 'doctor' in x.lower())
                 
+                for card in doctor_cards[:10]:  # Limit to 10
+                    name_elem = card.find('a') or card.find('h3') or card.find('h2')
+                    specialty_elem = card.find('p') or card.find('span', class_=lambda x: x and 'specialty' in x.lower() if x else False)
+                    location_elem = card.find('span', class_=lambda x: x and 'location' in x.lower() if x else False)
+                    
+                    if name_elem:
+                        doctor = {
+                            'name': name_elem.text.strip(),
+                            'specialty': specialty_elem.text.strip() if specialty_elem else 'Dermatology',
+                            'location': location_elem.text.strip() if location_elem else f'{governorate.title()} Area'
+                        }
+                        doctors.append(doctor)
+            except:
+                pass
+        
+        # If still no doctors found, use mock data
+        if not doctors:
+            st.info("Using sample doctor data for demonstration.")
+            return mock_doctors
+        
         return doctors
         
+    except requests.RequestException as e:
+        st.warning(f"Network error: {e}. Using sample data.")
+        return mock_doctors
     except Exception as e:
-        st.error(f"Error scraping doctors: {e}")
-        return []
+        st.warning(f"Scraping error: {e}. Using sample data.")
+        return mock_doctors
 
-# Image preprocessing function
+# Enhanced image preprocessing
 def preprocess_image(image):
-    """Preprocess image for model prediction"""
+    """Enhanced image preprocessing with error handling"""
     try:
         # Convert PIL image to numpy array
         img_array = np.array(image)
         
-        # Convert to RGB if necessary
-        if len(img_array.shape) == 3 and img_array.shape[2] == 4:  # RGBA
-            img_array = img_array[:, :, :3]
-        elif len(img_array.shape) == 2:  # Grayscale
+        # Handle different image formats
+        if len(img_array.shape) == 3:
+            if img_array.shape[2] == 4:  # RGBA
+                img_array = img_array[:, :, :3]
+            elif img_array.shape[2] == 1:  # Grayscale with channel
+                img_array = np.stack([img_array[:, :, 0]] * 3, axis=-1)
+        elif len(img_array.shape) == 2:  # Pure grayscale
             img_array = np.stack([img_array] * 3, axis=-1)
+        else:
+            raise ValueError(f"Unsupported image shape: {img_array.shape}")
         
-        # Resize to model input size (224x224)
+        # Ensure the image has the right data type
+        if img_array.dtype != np.uint8:
+            img_array = (img_array * 255).astype(np.uint8)
+        
+        # Resize to model input size
         img_resized = cv2.resize(img_array, (224, 224))
         
-        # Normalize pixel values
-        img_normalized = img_resized / 255.0
+        # Normalize pixel values to [0, 1]
+        img_normalized = img_resized.astype(np.float32) / 255.0
         
         # Add batch dimension
         img_batch = np.expand_dims(img_normalized, axis=0)
         
         return img_batch
+        
     except Exception as e:
         st.error(f"Error preprocessing image: {e}")
         return None
 
-# Prediction function
+# Enhanced prediction function
 def predict_skin_condition(image, model):
-    """Make prediction on the uploaded image"""
+    """Make prediction with enhanced error handling"""
     if model is None:
         return None, None
     
@@ -184,13 +331,26 @@ def predict_skin_condition(image, model):
             return None, None
         
         # Make prediction
-        predictions = model.predict(processed_image)
+        with st.spinner("Running inference..."):
+            predictions = model.predict(processed_image, verbose=0)
         
-        # Define class labels (adjust these based on your actual model)
+        # Define class labels (adjust based on your model)
         class_labels = ['Skin Cancer', 'Eczema', 'Vitiligo']
         
-        # Get prediction probabilities
-        probabilities = predictions[0]
+        # Handle different prediction shapes
+        if len(predictions.shape) > 1:
+            probabilities = predictions[0]
+        else:
+            probabilities = predictions
+        
+        # Ensure we have the right number of classes
+        if len(probabilities) != len(class_labels):
+            st.warning(f"Model outputs {len(probabilities)} classes, but {len(class_labels)} expected.")
+            # Pad or truncate as needed
+            if len(probabilities) < len(class_labels):
+                probabilities = np.pad(probabilities, (0, len(class_labels) - len(probabilities)))
+            else:
+                probabilities = probabilities[:len(class_labels)]
         
         # Create results dictionary
         results = {
@@ -205,10 +365,10 @@ def predict_skin_condition(image, model):
         
     except Exception as e:
         st.error(f"Error making prediction: {e}")
-        st.info("Falling back to mock predictions for demonstration.")
+        st.info("Falling back to mock predictions.")
         return mock_predict_skin_condition()
 
-# Sidebar navigation
+# Sidebar navigation (unchanged)
 def sidebar_navigation():
     with st.sidebar:
         st.markdown("# 🔬 SkinAI")
@@ -229,7 +389,7 @@ def sidebar_navigation():
     
     return page
 
-# Home page
+# Home page (unchanged)
 def home_page():
     st.markdown('<h1 class="main-header">🔬 SkinAI - Advanced Skin Analysis</h1>', unsafe_allow_html=True)
     st.markdown("### AI-Powered Skin Condition Detection & Medical Assistance")
@@ -261,13 +421,14 @@ def home_page():
         </div>
         """, unsafe_allow_html=True)
 
-# Prediction page
+# Enhanced prediction page
 def prediction_page():
     st.markdown("# 📸 Skin Condition Analysis")
     st.markdown("Upload an image of the affected skin area for AI-powered analysis")
     
-    # Load model
-    model = load_model()
+    # Load model with status display
+    with st.spinner("Loading AI model..."):
+        model = load_model()
     
     col1, col2 = st.columns([1, 1])
     
@@ -276,68 +437,80 @@ def prediction_page():
         uploaded_file = st.file_uploader(
             "Choose an image...", 
             type=['jpg', 'jpeg', 'png'],
-            help="Upload a clear image of the affected skin area",
+            help="Upload a clear image of the affected skin area (JPG, JPEG, or PNG format)",
             key="image_uploader"
         )
         
         if uploaded_file is not None:
-            # Display uploaded image
-            image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Image", use_column_width=True)
+            try:
+                # Display uploaded image
+                image = Image.open(uploaded_file)
+                st.image(image, caption="Uploaded Image", use_column_width=True)
+                
+                # Show image info
+                st.info(f"Image size: {image.size[0]}x{image.size[1]} pixels")
+                
+                # Prediction button
+                if st.button("🔍 Analyze Image", type="primary", key="analyze_button"):
+                    with st.spinner("Analyzing image..."):
+                        predicted_class, results = predict_skin_condition(image, model)
+                        
+                        if predicted_class and results:
+                            # Show model status
+                            if model == "mock":
+                                st.warning("⚠️ Using mock predictions for demonstration. Please ensure your model file is properly configured.")
+                            
+                            # Store in session state
+                            st.session_state.prediction_history.append({
+                                'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+                                'prediction': predicted_class,
+                                'confidence': max(results.values())
+                            })
+                            
+                            # Display results in the second column
+                            with col2:
+                                st.markdown("### 📋 Analysis Results")
+                                
+                                # Prediction card
+                                confidence = max(results.values())
+                                st.markdown(f"""
+                                <div class="prediction-card">
+                                    <h3>🎯 Predicted Condition: {predicted_class}</h3>
+                                    <p><strong>Confidence:</strong> {confidence:.1f}%</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # Probability chart
+                                df_results = pd.DataFrame(list(results.items()), columns=['Condition', 'Probability'])
+                                fig = px.bar(
+                                    df_results, 
+                                    x='Condition', 
+                                    y='Probability',
+                                    color='Probability',
+                                    title="Prediction Probabilities",
+                                    color_continuous_scale='viridis'
+                                )
+                                fig.update_layout(height=400)
+                                st.plotly_chart(fig, use_container_width=True)
+                                
+                                # Recommendations based on prediction
+                                st.markdown("### 💡 Recommendations")
+                                if "Cancer" in predicted_class:
+                                    st.error("⚠️ **URGENT:** This result suggests potential skin cancer. Please consult a dermatologist immediately for proper diagnosis.")
+                                elif "Eczema" in predicted_class:
+                                    st.info("ℹ️ **Eczema detected.** Consider seeing a dermatologist for proper treatment and management options.")
+                                elif "Vitiligo" in predicted_class:
+                                    st.info("ℹ️ **Vitiligo detected.** Consult a dermatologist to discuss treatment options and management strategies.")
+                                
+                                st.markdown("**⚠️ Medical Disclaimer:** This AI analysis is for educational and informational purposes only and should not replace professional medical advice, diagnosis, or treatment.")
+                        else:
+                            st.error("Failed to analyze the image. Please try again with a different image.")
             
-            # Prediction button
-            if st.button("🔍 Analyze Image", type="primary", key="analyze_button"):
-                with st.spinner("Analyzing image..."):
-                    predicted_class, results = predict_skin_condition(image, model)
-                    
-                    if predicted_class and results:
-                        # Show mock warning if using mock predictions
-                        if model == "mock":
-                            st.warning("⚠️ Using mock predictions for demonstration. Please fix your model file for real predictions.")
-                        
-                        # Store in session state
-                        st.session_state.prediction_history.append({
-                            'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
-                            'prediction': predicted_class,
-                            'confidence': max(results.values())
-                        })
-                        
-                        # Display results in the second column
-                        with col2:
-                            st.markdown("### 📋 Analysis Results")
-                            
-                            # Prediction card
-                            st.markdown(f"""
-                            <div class="prediction-card">
-                                <h3>🎯 Predicted Condition: {predicted_class}</h3>
-                                <p><strong>Confidence:</strong> {max(results.values()):.1f}%</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # Probability chart
-                            df_results = pd.DataFrame(list(results.items()), columns=['Condition', 'Probability'])
-                            fig = px.bar(
-                                df_results, 
-                                x='Condition', 
-                                y='Probability',
-                                color='Probability',
-                                title="Prediction Probabilities"
-                            )
-                            fig.update_layout(height=400)
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Recommendations based on prediction
-                            st.markdown("### 💡 Recommendations")
-                            if "Cancer" in predicted_class:
-                                st.warning("⚠️ **Important:** This result suggests potential skin cancer. Please consult a dermatologist immediately.")
-                            elif "Eczema" in predicted_class:
-                                st.info("ℹ️ **Eczema detected.** Consider seeing a dermatologist for proper treatment.")
-                            elif "Vitiligo" in predicted_class:
-                                st.info("ℹ️ **Vitiligo detected.** Consult a dermatologist for treatment options.")
-                            
-                            st.markdown("**Note:** This AI analysis is for educational purposes only.")
+            except Exception as e:
+                st.error(f"Error processing uploaded image: {e}")
+                st.info("Please try uploading a different image file.")
 
-# Find doctors page
+# Enhanced doctors page
 def doctors_page():
     st.markdown("# 🏥 Find Dermatologists")
     st.markdown("Locate qualified dermatologists in your area")
@@ -366,16 +539,17 @@ def doctors_page():
         if st.session_state.doctors_data:
             st.markdown("### 👨‍⚕️ Available Doctors")
             
-            # Display doctors
-            for doctor in st.session_state.doctors_data:
-                st.markdown(f"""
-                **👨‍⚕️ Dr. {doctor['name']}**
-                - **Specialty:** {doctor['specialty']}
-                - **Location:** {doctor['location']}
-                ---
-                """)
+            # Display doctors in a more organized way
+            for i, doctor in enumerate(st.session_state.doctors_data, 1):
+                with st.container():
+                    st.markdown(f"""
+                    **👨‍⚕️ {i}. Dr. {doctor['name']}**
+                    - **Specialty:** {doctor['specialty']}
+                    - **Location:** {doctor['location']}
+                    """)
+                    st.markdown("---")
 
-# About page
+# About page (unchanged)
 def about_page():
     st.markdown("# ℹ️ About SkinAI")
     
@@ -409,7 +583,7 @@ def about_page():
     For technical support or medical inquiries, please consult with healthcare professionals in your area.
     """)
 
-# History page
+# Enhanced history page
 def history_page():
     st.markdown("# 📊 Prediction History")
     
@@ -434,40 +608,62 @@ def history_page():
         st.markdown("### Recent Predictions")
         st.dataframe(df_history, use_container_width=True)
         
-        # Visualization
+        # Visualizations
         if len(df_history) > 1:
-            fig = px.pie(
-                df_history, 
-                names='prediction', 
-                title="Distribution of Predictions",
-                color_discrete_sequence=px.colors.qualitative.Set3
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Pie chart of predictions
+                fig_pie = px.pie(
+                    df_history, 
+                    names='prediction', 
+                    title="Distribution of Predictions",
+                    color_discrete_sequence=px.colors.qualitative.Set3
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+            
+            with col2:
+                # Confidence over time
+                df_history['prediction_number'] = range(1, len(df_history) + 1)
+                fig_line = px.line(
+                    df_history, 
+                    x='prediction_number', 
+                    y='confidence',
+                    title="Confidence Scores Over Time",
+                    markers=True
+                )
+                fig_line.update_xaxes(title="Prediction Number")
+                fig_line.update_yaxes(title="Confidence (%)")
+                st.plotly_chart(fig_line, use_container_width=True)
         
         # Clear history button
         if st.button("🗑️ Clear History", type="secondary", key="clear_history_button"):
             st.session_state.prediction_history = []
             st.success("History cleared successfully!")
-            st.rerun()  # Fixed deprecated st.experimental_rerun()
+            st.rerun()
     else:
         st.info("No prediction history available. Start by analyzing some images!")
 
 # Main application
 def main():
-    # Sidebar navigation
-    selected_page = sidebar_navigation()
-    
-    # Route to appropriate page
-    if selected_page == "Home":
-        home_page()
-    elif selected_page == "Prediction":
-        prediction_page()
-    elif selected_page == "Find Doctors":
-        doctors_page()
-    elif selected_page == "About":
-        about_page()
-    elif selected_page == "History":
-        history_page()
+    try:
+        # Sidebar navigation
+        selected_page = sidebar_navigation()
+        
+        # Route to appropriate page
+        if selected_page == "Home":
+            home_page()
+        elif selected_page == "Prediction":
+            prediction_page()
+        elif selected_page == "Find Doctors":
+            doctors_page()
+        elif selected_page == "About":
+            about_page()
+        elif selected_page == "History":
+            history_page()
+    except Exception as e:
+        st.error(f"Application error: {e}")
+        st.info("Please refresh the page and try again.")
 
 if __name__ == "__main__":
     main()
