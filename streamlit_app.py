@@ -2,16 +2,12 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-import cv2
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from streamlit_option_menu import option_menu
 import requests
 from bs4 import BeautifulSoup
 import time
-import base64
-from io import BytesIO
+import cv2
 
 # Page configuration
 st.set_page_config(
@@ -34,13 +30,6 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     
-    .sub-header {
-        font-size: 1.5rem;
-        color: #4a4a4a;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    
     .info-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 1.5rem;
@@ -55,24 +44,6 @@ st.markdown("""
         border-radius: 10px;
         padding: 1.5rem;
         margin: 1rem 0;
-    }
-    
-    .doctor-card {
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .metric-card {
-        background: linear-gradient(45deg, #667eea, #764ba2);
-        color: white;
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-        margin: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -113,14 +84,14 @@ def scrape_doctors(governorate="cairo"):
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
-        soup = BeautifulSoup(response.content, "lxml")
+        soup = BeautifulSoup(response.content, "html.parser")
         
         names = soup.find_all('a', {'class': 'CommonStylesstyle__TransparentA-sc-1vkcu2o-2 cTFrlk'})
         specialties = soup.find_all('p', {'class': 'DoctorCardSubComponentsstyle__Text-sc-1vq3h7c-14 DoctorCardSubComponentsstyle__DescText-sc-1vq3h7c-17 fuBVZG esZVig'})
         locations = soup.find_all('span', {'class': 'DoctorCardstyle__Text-sc-uptab2-4 blwPZf'})
         
         doctors = []
-        min_length = min(len(names), len(specialties), len(locations))
+        min_length = min(len(names), len(specialties), len(locations), 10)  # Limit to 10
         
         for i in range(min_length):
             try:
@@ -146,7 +117,7 @@ def preprocess_image(image):
         # Convert PIL image to numpy array
         img_array = np.array(image)
         
-        # Resize to model input size (assuming 224x224)
+        # Resize to model input size (224x224)
         img_resized = cv2.resize(img_array, (224, 224))
         
         # Normalize pixel values
@@ -175,7 +146,7 @@ def predict_skin_condition(image, model):
         # Make prediction
         predictions = model.predict(processed_image)
         
-        # Define class labels (adjust according to your model)
+        # Define class labels
         class_labels = ['Skin Cancer', 'Eczema', 'Vitiligo']
         
         # Get prediction probabilities
@@ -189,7 +160,6 @@ def predict_skin_condition(image, model):
         
         # Get predicted class
         predicted_class = class_labels[np.argmax(probabilities)]
-        confidence = float(np.max(probabilities)) * 100
         
         return predicted_class, results
         
@@ -200,36 +170,27 @@ def predict_skin_condition(image, model):
 # Sidebar navigation
 def sidebar_navigation():
     with st.sidebar:
-        st.image("https://via.placeholder.com/200x100/667eea/ffffff?text=SkinAI", width=200)
+        st.markdown("# 🔬 SkinAI")
         
-        selected = option_menu(
-            menu_title="Navigation",
-            options=["Home", "Prediction", "Find Doctors", "About", "History"],
-            icons=["house", "camera", "geo-alt", "info-circle", "clock-history"],
-            menu_icon="cast",
-            default_index=0,
-            styles={
-                "container": {"padding": "0!important", "background-color": "#fafafa"},
-                "icon": {"color": "#667eea", "font-size": "18px"},
-                "nav-link": {"font-size": "16px", "text-align": "left", "margin": "0px", "--hover-color": "#eee"},
-                "nav-link-selected": {"background-color": "#667eea"},
-            }
+        page = st.selectbox(
+            "Navigate to:",
+            ["Home", "Prediction", "Find Doctors", "About", "History"]
         )
         
         st.markdown("---")
         st.markdown("### Quick Stats")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Accuracy", "94.2%", "2.1%")
+            st.metric("Accuracy", "94.2%")
         with col2:
-            st.metric("Predictions", "1.2K+", "156")
+            st.metric("Predictions", "1.2K+")
     
-    return selected
+    return page
 
 # Home page
 def home_page():
     st.markdown('<h1 class="main-header">🔬 SkinAI - Advanced Skin Analysis</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">AI-Powered Skin Condition Detection & Medical Assistance</p>', unsafe_allow_html=True)
+    st.markdown("### AI-Powered Skin Condition Detection & Medical Assistance")
     
     # Feature cards
     col1, col2, col3 = st.columns(3)
@@ -238,7 +199,7 @@ def home_page():
         st.markdown("""
         <div class="info-card">
             <h3>🎯 Accurate Detection</h3>
-            <p>Advanced deep learning model with 94%+ accuracy in detecting skin cancer, eczema, and vitiligo</p>
+            <p>Advanced deep learning model for detecting skin cancer, eczema, and vitiligo</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -246,7 +207,7 @@ def home_page():
         st.markdown("""
         <div class="info-card">
             <h3>🏥 Find Doctors</h3>
-            <p>Locate nearby dermatologists in Cairo, Giza, and other governorates for professional consultation</p>
+            <p>Locate nearby dermatologists in Cairo, Giza, and other governorates</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -254,22 +215,9 @@ def home_page():
         st.markdown("""
         <div class="info-card">
             <h3>📱 Easy to Use</h3>
-            <p>Simple image upload interface with instant results and detailed analysis reports</p>
+            <p>Simple image upload interface with instant results</p>
         </div>
         """, unsafe_allow_html=True)
-    
-    # Statistics dashboard
-    st.markdown("### 📊 Platform Statistics")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown('<div class="metric-card"><h3>15K+</h3><p>Images Analyzed</p></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown('<div class="metric-card"><h3>94.2%</h3><p>Accuracy Rate</p></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown('<div class="metric-card"><h3>500+</h3><p>Doctors Network</p></div>', unsafe_allow_html=True)
-    with col4:
-        st.markdown('<div class="metric-card"><h3>24/7</h3><p>Availability</p></div>', unsafe_allow_html=True)
 
 # Prediction page
 def prediction_page():
@@ -326,7 +274,6 @@ def prediction_page():
                                 x='Condition', 
                                 y='Probability',
                                 color='Probability',
-                                color_continuous_scale='viridis',
                                 title="Prediction Probabilities"
                             )
                             fig.update_layout(height=400)
@@ -337,11 +284,11 @@ def prediction_page():
                             if "Cancer" in predicted_class:
                                 st.warning("⚠️ **Important:** This result suggests potential skin cancer. Please consult a dermatologist immediately.")
                             elif "Eczema" in predicted_class:
-                                st.info("ℹ️ **Eczema detected.** Consider seeing a dermatologist for proper treatment and management.")
+                                st.info("ℹ️ **Eczema detected.** Consider seeing a dermatologist for proper treatment.")
                             elif "Vitiligo" in predicted_class:
-                                st.info("ℹ️ **Vitiligo detected.** Consult a dermatologist for treatment options and management strategies.")
+                                st.info("ℹ️ **Vitiligo detected.** Consult a dermatologist for treatment options.")
                             
-                            st.markdown("**Note:** This AI analysis is for educational purposes only and should not replace professional medical advice.")
+                            st.markdown("**Note:** This AI analysis is for educational purposes only.")
 
 # Find doctors page
 def doctors_page():
@@ -354,8 +301,7 @@ def doctors_page():
         st.markdown("### Select Location")
         governorate = st.selectbox(
             "Choose Governorate:",
-            ["Cairo", "Giza", "Alexandria", "Qalyubia"],
-            help="Select your governorate to find nearby doctors"
+            ["Cairo", "Giza", "Alexandria", "Qalyubia"]
         )
         
         if st.button("🔍 Search Doctors", type="primary"):
@@ -366,33 +312,20 @@ def doctors_page():
                     st.session_state.doctors_data = doctors
                     st.success(f"Found {len(doctors)} dermatologists in {governorate}")
                 else:
-                    st.error("No doctors found or unable to fetch data. Please try again.")
+                    st.error("No doctors found. Please try again.")
     
     with col2:
         if 'doctors_data' in st.session_state and st.session_state.doctors_data:
             st.markdown("### 👨‍⚕️ Available Doctors")
             
-            # Create DataFrame for better display
-            doctors_df = pd.DataFrame(st.session_state.doctors_data)
-            
-            # Display doctors in cards
-            for idx, doctor in enumerate(st.session_state.doctors_data):
+            # Display doctors
+            for doctor in st.session_state.doctors_data:
                 st.markdown(f"""
-                <div class="doctor-card">
-                    <h4>👨‍⚕️ Dr. {doctor['name']}</h4>
-                    <p><strong>Specialty:</strong> {doctor['specialty']}</p>
-                    <p><strong>Location:</strong> {doctor['location']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Download option
-            csv_data = doctors_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Doctor List (CSV)",
-                data=csv_data,
-                file_name=f"doctors_{governorate.lower()}.csv",
-                mime="text/csv"
-            )
+                **👨‍⚕️ Dr. {doctor['name']}**
+                - **Specialty:** {doctor['specialty']}
+                - **Location:** {doctor['location']}
+                ---
+                """)
 
 # About page
 def about_page():
@@ -400,13 +333,67 @@ def about_page():
     
     st.markdown("""
     ## 🎯 Our Mission
-    SkinAI is an advanced AI-powered platform designed to assist in the early detection and analysis of common skin conditions including skin cancer, eczema, and vitiligo. Our goal is to make dermatological screening more accessible while connecting users with qualified medical professionals.
+    SkinAI is an AI-powered platform for skin condition analysis including skin cancer, eczema, and vitiligo detection.
     
     ## 🔬 Technology
-    Our deep learning model is trained on thousands of dermatological images and achieves over 94% accuracy in classifying skin conditions. The model uses convolutional neural networks (CNNs) optimized for medical image analysis.
+    Our deep learning model analyzes skin images to provide preliminary assessments with confidence scores.
     
     ## ⚠️ Important Disclaimer
-    **This application is for educational and screening purposes only.** It should never replace professional medical diagnosis or treatment. Always consult with qualified dermatologists for proper medical care.
+    **This application is for educational purposes only.** Always consult with qualified dermatologists for proper medical diagnosis and treatment.
+    
+    ## 📊 Features
+    - AI-powered skin analysis
+    - Doctor finder for Egyptian governorates
+    - Interactive results visualization
+    - Prediction history tracking
+    """)
+
+# History page
+def history_page():
+    st.markdown("# 📊 Prediction History")
+    
+    if st.session_state.prediction_history:
+        # Display history
+        df_history = pd.DataFrame(st.session_state.prediction_history)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Predictions", len(df_history))
+        with col2:
+            avg_confidence = df_history['confidence'].mean()
+            st.metric("Average Confidence", f"{avg_confidence:.1f}%")
+        with col3:
+            most_common = df_history['prediction'].mode().iloc[0] if len(df_history) > 0 else "N/A"
+            st.metric("Most Common", most_common)
+        
+        st.markdown("### Recent Predictions")
+        st.dataframe(df_history, use_container_width=True)
+        
+        if st.button("🗑️ Clear History"):
+            st.session_state.prediction_history = []
+            st.rerun()
+    else:
+        st.info("No prediction history available. Start by analyzing some images!")
+
+# Main application
+def main():
+    # Sidebar navigation
+    selected_page = sidebar_navigation()
+    
+    # Route to appropriate page
+    if selected_page == "Home":
+        home_page()
+    elif selected_page == "Prediction":
+        prediction_page()
+    elif selected_page == "Find Doctors":
+        doctors_page()
+    elif selected_page == "About":
+        about_page()
+    elif selected_page == "History":
+        history_page()
+
+if __name__ == "__main__":
+    main(). Always consult with qualified dermatologists for proper medical care.
     
     ## 🏥 Doctor Network
     We provide access to a comprehensive network of dermatologists across Egypt, making it easier for users to find and connect with qualified medical professionals in their area.
