@@ -51,6 +51,8 @@ st.markdown("""
 # Initialize session state
 if 'prediction_history' not in st.session_state:
     st.session_state.prediction_history = []
+if 'doctors_data' not in st.session_state:
+    st.session_state.doctors_data = []
 
 # Load model function
 @st.cache_resource
@@ -61,6 +63,7 @@ def load_model():
         return model
     except Exception as e:
         st.error(f"Error loading model: {e}")
+        st.info("Please ensure 'skindisease.h5' model file is in the same directory as this script.")
         return None
 
 # Doctor scraping function
@@ -117,6 +120,12 @@ def preprocess_image(image):
         # Convert PIL image to numpy array
         img_array = np.array(image)
         
+        # Convert to RGB if necessary
+        if len(img_array.shape) == 3 and img_array.shape[2] == 4:  # RGBA
+            img_array = img_array[:, :, :3]
+        elif len(img_array.shape) == 2:  # Grayscale
+            img_array = np.stack([img_array] * 3, axis=-1)
+        
         # Resize to model input size (224x224)
         img_resized = cv2.resize(img_array, (224, 224))
         
@@ -146,7 +155,7 @@ def predict_skin_condition(image, model):
         # Make prediction
         predictions = model.predict(processed_image)
         
-        # Define class labels
+        # Define class labels (adjust these based on your actual model)
         class_labels = ['Skin Cancer', 'Eczema', 'Vitiligo']
         
         # Get prediction probabilities
@@ -183,7 +192,7 @@ def sidebar_navigation():
         with col1:
             st.metric("Accuracy", "94.2%")
         with col2:
-            st.metric("Predictions", "1.2K+")
+            st.metric("Predictions", f"{len(st.session_state.prediction_history)}")
     
     return page
 
@@ -244,51 +253,54 @@ def prediction_page():
             
             # Prediction button
             if st.button("🔍 Analyze Image", type="primary"):
-                with st.spinner("Analyzing image..."):
-                    predicted_class, results = predict_skin_condition(image, model)
-                    
-                    if predicted_class and results:
-                        # Store in session state
-                        st.session_state.prediction_history.append({
-                            'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
-                            'prediction': predicted_class,
-                            'confidence': max(results.values())
-                        })
+                if model is not None:
+                    with st.spinner("Analyzing image..."):
+                        predicted_class, results = predict_skin_condition(image, model)
                         
-                        # Display results in the second column
-                        with col2:
-                            st.markdown("### 📋 Analysis Results")
+                        if predicted_class and results:
+                            # Store in session state
+                            st.session_state.prediction_history.append({
+                                'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+                                'prediction': predicted_class,
+                                'confidence': max(results.values())
+                            })
                             
-                            # Prediction card
-                            st.markdown(f"""
-                            <div class="prediction-card">
-                                <h3>🎯 Predicted Condition: {predicted_class}</h3>
-                                <p><strong>Confidence:</strong> {max(results.values()):.1f}%</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # Probability chart
-                            df_results = pd.DataFrame(list(results.items()), columns=['Condition', 'Probability'])
-                            fig = px.bar(
-                                df_results, 
-                                x='Condition', 
-                                y='Probability',
-                                color='Probability',
-                                title="Prediction Probabilities"
-                            )
-                            fig.update_layout(height=400)
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Recommendations based on prediction
-                            st.markdown("### 💡 Recommendations")
-                            if "Cancer" in predicted_class:
-                                st.warning("⚠️ **Important:** This result suggests potential skin cancer. Please consult a dermatologist immediately.")
-                            elif "Eczema" in predicted_class:
-                                st.info("ℹ️ **Eczema detected.** Consider seeing a dermatologist for proper treatment.")
-                            elif "Vitiligo" in predicted_class:
-                                st.info("ℹ️ **Vitiligo detected.** Consult a dermatologist for treatment options.")
-                            
-                            st.markdown("**Note:** This AI analysis is for educational purposes only.")
+                            # Display results in the second column
+                            with col2:
+                                st.markdown("### 📋 Analysis Results")
+                                
+                                # Prediction card
+                                st.markdown(f"""
+                                <div class="prediction-card">
+                                    <h3>🎯 Predicted Condition: {predicted_class}</h3>
+                                    <p><strong>Confidence:</strong> {max(results.values()):.1f}%</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # Probability chart
+                                df_results = pd.DataFrame(list(results.items()), columns=['Condition', 'Probability'])
+                                fig = px.bar(
+                                    df_results, 
+                                    x='Condition', 
+                                    y='Probability',
+                                    color='Probability',
+                                    title="Prediction Probabilities"
+                                )
+                                fig.update_layout(height=400)
+                                st.plotly_chart(fig, use_container_width=True)
+                                
+                                # Recommendations based on prediction
+                                st.markdown("### 💡 Recommendations")
+                                if "Cancer" in predicted_class:
+                                    st.warning("⚠️ **Important:** This result suggests potential skin cancer. Please consult a dermatologist immediately.")
+                                elif "Eczema" in predicted_class:
+                                    st.info("ℹ️ **Eczema detected.** Consider seeing a dermatologist for proper treatment.")
+                                elif "Vitiligo" in predicted_class:
+                                    st.info("ℹ️ **Vitiligo detected.** Consult a dermatologist for treatment options.")
+                                
+                                st.markdown("**Note:** This AI analysis is for educational purposes only.")
+                else:
+                    st.error("Model not loaded. Please check if the model file exists.")
 
 # Find doctors page
 def doctors_page():
@@ -315,7 +327,7 @@ def doctors_page():
                     st.error("No doctors found. Please try again.")
     
     with col2:
-        if 'doctors_data' in st.session_state and st.session_state.doctors_data:
+        if st.session_state.doctors_data:
             st.markdown("### 👨‍⚕️ Available Doctors")
             
             # Display doctors
@@ -346,54 +358,20 @@ def about_page():
     - Doctor finder for Egyptian governorates
     - Interactive results visualization
     - Prediction history tracking
+    
+    ## 🏥 Doctor Network
+    We provide access to a comprehensive network of dermatologists across Egypt, making it easier for users to find and connect with qualified medical professionals in their area.
+    
+    ## 📊 Key Features
+    - **AI-Powered Analysis**: Advanced deep learning for accurate skin condition detection
+    - **Doctor Finder**: Locate nearby dermatologists in major Egyptian governorates
+    - **User-Friendly Interface**: Simple, intuitive design for easy navigation
+    - **Instant Results**: Get analysis results within seconds
+    - **History Tracking**: Keep track of your previous analyses
+    
+    ## 👥 Contact & Support
+    For technical support or medical inquiries, please consult with healthcare professionals in your area.
     """)
-
-# History page
-def history_page():
-    st.markdown("# 📊 Prediction History")
-    
-    if st.session_state.prediction_history:
-        # Display history
-        df_history = pd.DataFrame(st.session_state.prediction_history)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Predictions", len(df_history))
-        with col2:
-            avg_confidence = df_history['confidence'].mean()
-            st.metric("Average Confidence", f"{avg_confidence:.1f}%")
-        with col3:
-            most_common = df_history['prediction'].mode().iloc[0] if len(df_history) > 0 else "N/A"
-            st.metric("Most Common", most_common)
-        
-        st.markdown("### Recent Predictions")
-        st.dataframe(df_history, use_container_width=True)
-        
-        if st.button("🗑️ Clear History"):
-            st.session_state.prediction_history = []
-            st.rerun()
-    else:
-        st.info("No prediction history available. Start by analyzing some images!")
-
-# Main application
-def main():
-    # Sidebar navigation
-    selected_page = sidebar_navigation()
-    
-    # Route to appropriate page
-    if selected_page == "Home":
-        home_page()
-    elif selected_page == "Prediction":
-        prediction_page()
-    elif selected_page == "Find Doctors":
-        doctors_page()
-    elif selected_page == "About":
-        about_page()
-    elif selected_page == "History":
-        history_page()
-
-if __name__ == "__main__":
-    main()
 
 # History page
 def history_page():
@@ -412,8 +390,9 @@ def history_page():
                 avg_confidence = df_history['confidence'].mean()
                 st.metric("Average Confidence", f"{avg_confidence:.1f}%")
         with col3:
-            most_common = df_history['prediction'].mode().iloc[0] if len(df_history) > 0 else "N/A"
-            st.metric("Most Common", most_common)
+            if len(df_history) > 0:
+                most_common = df_history['prediction'].mode().iloc[0] if len(df_history) > 0 else "N/A"
+                st.metric("Most Common", most_common)
         
         # Display history table
         st.markdown("### Recent Predictions")
@@ -433,7 +412,7 @@ def history_page():
         if st.button("🗑️ Clear History", type="secondary"):
             st.session_state.prediction_history = []
             st.success("History cleared successfully!")
-            st.experimental_rerun()
+            st.rerun()  # Fixed deprecated st.experimental_rerun()
     else:
         st.info("No prediction history available. Start by analyzing some images!")
 
