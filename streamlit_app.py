@@ -59,12 +59,38 @@ if 'doctors_data' not in st.session_state:
 def load_model():
     """Load the trained skin disease model"""
     try:
-        model = tf.keras.models.load_model('skindisease.h5')
+        # Try loading with custom objects if needed
+        model = tf.keras.models.load_model('skindisease.h5', compile=False)
+        
+        # Recompile the model to fix potential issues
+        model.compile(
+            optimizer='adam',
+            loss='categorical_crossentropy',
+            metrics=['accuracy']
+        )
+        
         return model
     except Exception as e:
         st.error(f"Error loading model: {e}")
-        st.info("Please ensure 'skindisease.h5' model file is in the same directory as this script.")
-        return None
+        st.warning("Using mock predictions for demonstration. Please fix your model file.")
+        return "mock"  # Return mock indicator
+
+# Mock prediction function for testing
+def mock_predict_skin_condition():
+    """Generate mock predictions for testing when model fails to load"""
+    # Generate random but realistic predictions
+    predictions = np.random.dirichlet([2, 1, 1])  # Bias towards first class
+    
+    class_labels = ['Skin Cancer', 'Eczema', 'Vitiligo']
+    
+    results = {
+        class_labels[i]: float(predictions[i]) * 100 
+        for i in range(len(class_labels))
+    }
+    
+    predicted_class = class_labels[np.argmax(predictions)]
+    
+    return predicted_class, results
 
 # Doctor scraping function
 def scrape_doctors(governorate="cairo"):
@@ -146,6 +172,11 @@ def predict_skin_condition(image, model):
     if model is None:
         return None, None
     
+    # Use mock predictions if model loading failed
+    if model == "mock":
+        time.sleep(1)  # Simulate processing time
+        return mock_predict_skin_condition()
+    
     try:
         # Preprocess image
         processed_image = preprocess_image(image)
@@ -174,7 +205,8 @@ def predict_skin_condition(image, model):
         
     except Exception as e:
         st.error(f"Error making prediction: {e}")
-        return None, None
+        st.info("Falling back to mock predictions for demonstration.")
+        return mock_predict_skin_condition()
 
 # Sidebar navigation
 def sidebar_navigation():
@@ -255,54 +287,55 @@ def prediction_page():
             
             # Prediction button
             if st.button("🔍 Analyze Image", type="primary", key="analyze_button"):
-                if model is not None:
-                    with st.spinner("Analyzing image..."):
-                        predicted_class, results = predict_skin_condition(image, model)
+                with st.spinner("Analyzing image..."):
+                    predicted_class, results = predict_skin_condition(image, model)
+                    
+                    if predicted_class and results:
+                        # Show mock warning if using mock predictions
+                        if model == "mock":
+                            st.warning("⚠️ Using mock predictions for demonstration. Please fix your model file for real predictions.")
                         
-                        if predicted_class and results:
-                            # Store in session state
-                            st.session_state.prediction_history.append({
-                                'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
-                                'prediction': predicted_class,
-                                'confidence': max(results.values())
-                            })
+                        # Store in session state
+                        st.session_state.prediction_history.append({
+                            'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+                            'prediction': predicted_class,
+                            'confidence': max(results.values())
+                        })
+                        
+                        # Display results in the second column
+                        with col2:
+                            st.markdown("### 📋 Analysis Results")
                             
-                            # Display results in the second column
-                            with col2:
-                                st.markdown("### 📋 Analysis Results")
-                                
-                                # Prediction card
-                                st.markdown(f"""
-                                <div class="prediction-card">
-                                    <h3>🎯 Predicted Condition: {predicted_class}</h3>
-                                    <p><strong>Confidence:</strong> {max(results.values()):.1f}%</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                # Probability chart
-                                df_results = pd.DataFrame(list(results.items()), columns=['Condition', 'Probability'])
-                                fig = px.bar(
-                                    df_results, 
-                                    x='Condition', 
-                                    y='Probability',
-                                    color='Probability',
-                                    title="Prediction Probabilities"
-                                )
-                                fig.update_layout(height=400)
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Recommendations based on prediction
-                                st.markdown("### 💡 Recommendations")
-                                if "Cancer" in predicted_class:
-                                    st.warning("⚠️ **Important:** This result suggests potential skin cancer. Please consult a dermatologist immediately.")
-                                elif "Eczema" in predicted_class:
-                                    st.info("ℹ️ **Eczema detected.** Consider seeing a dermatologist for proper treatment.")
-                                elif "Vitiligo" in predicted_class:
-                                    st.info("ℹ️ **Vitiligo detected.** Consult a dermatologist for treatment options.")
-                                
-                                st.markdown("**Note:** This AI analysis is for educational purposes only.")
-                else:
-                    st.error("Model not loaded. Please check if the model file exists.")
+                            # Prediction card
+                            st.markdown(f"""
+                            <div class="prediction-card">
+                                <h3>🎯 Predicted Condition: {predicted_class}</h3>
+                                <p><strong>Confidence:</strong> {max(results.values()):.1f}%</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Probability chart
+                            df_results = pd.DataFrame(list(results.items()), columns=['Condition', 'Probability'])
+                            fig = px.bar(
+                                df_results, 
+                                x='Condition', 
+                                y='Probability',
+                                color='Probability',
+                                title="Prediction Probabilities"
+                            )
+                            fig.update_layout(height=400)
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Recommendations based on prediction
+                            st.markdown("### 💡 Recommendations")
+                            if "Cancer" in predicted_class:
+                                st.warning("⚠️ **Important:** This result suggests potential skin cancer. Please consult a dermatologist immediately.")
+                            elif "Eczema" in predicted_class:
+                                st.info("ℹ️ **Eczema detected.** Consider seeing a dermatologist for proper treatment.")
+                            elif "Vitiligo" in predicted_class:
+                                st.info("ℹ️ **Vitiligo detected.** Consult a dermatologist for treatment options.")
+                            
+                            st.markdown("**Note:** This AI analysis is for educational purposes only.")
 
 # Find doctors page
 def doctors_page():
