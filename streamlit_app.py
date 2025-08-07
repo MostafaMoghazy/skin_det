@@ -335,7 +335,7 @@ def predict_skin_condition(image, model):
             predictions = model.predict(processed_image, verbose=0)
         
         # Define class labels (adjust based on your model)
-        class_labels = ['Skin Cancer', 'Eczema', 'Vitiligo']
+        class_labels = ['Eczema','Skin Cancer', 'Vitiligo']
         
         # Handle different prediction shapes
         if len(predictions.shape) > 1:
