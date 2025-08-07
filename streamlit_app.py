@@ -60,7 +60,7 @@ def load_model():
     """Load the trained skin disease model with better error handling"""
     try:
         # Attempt multiple loading strategies
-        model_path = 'skindisease.keras'
+        model_path = 'skindisease101010.keras'
         
         # Strategy 1: Load with compile=False and custom_objects
         try:
