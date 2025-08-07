@@ -393,21 +393,7 @@ def main():
         history_page()
 
 if __name__ == "__main__":
-    main(). Always consult with qualified dermatologists for proper medical care.
-    
-    ## 🏥 Doctor Network
-    We provide access to a comprehensive network of dermatologists across Egypt, making it easier for users to find and connect with qualified medical professionals in their area.
-    
-    ## 📊 Key Features
-    - **AI-Powered Analysis**: Advanced deep learning for accurate skin condition detection
-    - **Doctor Finder**: Locate nearby dermatologists in major Egyptian governorates
-    - **User-Friendly Interface**: Simple, intuitive design for easy navigation
-    - **Instant Results**: Get analysis results within seconds
-    - **History Tracking**: Keep track of your previous analyses
-    
-    ## 👥 Contact & Support
-    For technical support or medical inquiries, please consult with healthcare professionals in your area.
-    """)
+    main()
 
 # History page
 def history_page():
