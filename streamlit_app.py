@@ -391,7 +391,7 @@ def sidebar_navigation():
 
 # Home page (unchanged)
 def home_page():
-    st.markdown('<h1 class="main-header">🔬 SkinAI - Advanced Skin Analysis</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🔬 DermaScan AI - Advanced Skin Analysis</h1>', unsafe_allow_html=True)
     st.markdown("### AI-Powered Skin Condition Detection & Medical Assistance")
     
     # Feature cards
@@ -551,11 +551,11 @@ def doctors_page():
 
 # About page (unchanged)
 def about_page():
-    st.markdown("# ℹ️ About SkinAI")
+    st.markdown("# ℹ️ About DermaScan AI")
     
     st.markdown("""
     ## 🎯 Our Mission
-    SkinAI is an AI-powered platform for skin condition analysis including skin cancer, eczema, and vitiligo detection.
+    DermaScan AI is an AI-powered platform for skin condition analysis including skin cancer, eczema, and vitiligo detection.
     
     ## 🔬 Technology
     Our deep learning model analyzes skin images to provide preliminary assessments with confidence scores.
