@@ -11,7 +11,7 @@ import cv2
 
 # Page configuration
 st.set_page_config(
-    page_title="SkinAI - Skin Condition Predictor",
+    page_title="DermaScan AI - Skin Condition Predictor",
     page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -371,7 +371,7 @@ def predict_skin_condition(image, model):
 # Sidebar navigation (unchanged)
 def sidebar_navigation():
     with st.sidebar:
-        st.markdown("# 🔬 SkinAI")
+        st.markdown("# 🔬 DermaScan AI")
         
         page = st.selectbox(
             "Navigate to:",
